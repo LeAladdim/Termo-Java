@@ -4,7 +4,6 @@ import java.awt.event.KeyEvent;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.*;
 import java.text.Normalizer;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -16,9 +15,6 @@ import java.util.Random;
 
 /**
  * Clone do Termo (Wordle em português) em Java Swing.
- *
- * Compilar: javac -encoding UTF-8 Termo.java
- * Executar: java Termo
  */
 public class Termo extends JFrame {
 
@@ -36,7 +32,7 @@ public class Termo extends JFrame {
   static final Color WRONG = new Color(0x241f21);
   static final Color KEY = new Color(0x5e5156);
 
-  // Dicionário: normalizada (sem acento, maiúscula) -> forma acentuada
+  // Dicionário
   private final Map<String, String> dict = new HashMap<>();
   private final List<String> answers = new ArrayList<>();
   private final Random rnd = new Random();
@@ -47,10 +43,10 @@ public class Termo extends JFrame {
   private final char[] cur = new char[LEN]; // '\0' = casa vazia
   private final JLabel msg = new JLabel(" ", SwingConstants.CENTER);
 
-  private int row, col; // col = casa selecionada (0..4)
+  private int row, col;
   private boolean busy, over;
   private String answer, answerN;
-  private boolean strict = true;
+  private boolean strict = false;
 
   // ---------- Tile ----------
   static class Tile extends JComponent {
@@ -58,7 +54,12 @@ public class Termo extends JFrame {
     S st = S.EMPTY;
     boolean active;
 
-    Tile() { setPreferredSize(new Dimension(62, 62)); }
+    Tile() {
+      Dimension d = new Dimension(62, 62);
+      setPreferredSize(d);
+      setMinimumSize(d);
+      setMaximumSize(d);
+    }
 
     @Override protected void paintComponent(Graphics g0) {
       Graphics2D g = (Graphics2D) g0.create();
@@ -128,7 +129,9 @@ public class Termo extends JFrame {
 
     JPanel boardContainer = new JPanel(new GridBagLayout());
     boardContainer.setBackground(BG);
-    boardContainer.add(board);
+    GridBagConstraints gbc = new GridBagConstraints();
+    gbc.anchor = GridBagConstraints.CENTER;
+    boardContainer.add(board, gbc);
     add(boardContainer, BorderLayout.CENTER);
 
     add(buildKeyboard(), BorderLayout.SOUTH);
@@ -200,33 +203,35 @@ public class Termo extends JFrame {
   }
 
   private void loadWords() {
-    Path file = Paths.get("src/palavras.txt");
+    java.io.InputStream is = getClass().getResourceAsStream("/palavras.txt");
 
-    if (!Files.exists(file)) {
+    if (is == null) {
       JOptionPane.showMessageDialog(null,
-          "Arquivo 'palavras.txt' não encontrado!\n\n" +
-              "Crie um arquivo de texto com esse nome na mesma pasta do jogo.\n" +
-              "Coloque uma palavra de 5 letras por linha e salve em UTF-8.",
+          "Ficheiro 'palavras.txt' não encontrado!\n\n" +
+              "Certifique-se de que o ficheiro está exatamente dentro da pasta 'src'.",
           "Erro - Dicionário Ausente",
           JOptionPane.ERROR_MESSAGE);
       System.exit(0);
     }
 
-    try {
-      for (String line : Files.readAllLines(file, StandardCharsets.UTF_8)) {
+    try (java.io.BufferedReader reader = new java.io.BufferedReader(new java.io.InputStreamReader(is, StandardCharsets.UTF_8))) {
+      String line;
+      while ((line = reader.readLine()) != null) {
         String w = line.trim();
+        if (w.isEmpty()) continue;
+
         String n = norm(w);
         if (n.matches("[A-Z]{5}") && dict.putIfAbsent(n, w.toLowerCase()) == null) {
           answers.add(w);
         }
       }
     } catch (Exception e) {
-      JOptionPane.showMessageDialog(null, "Falha ao ler o arquivo palavras.txt.", "Erro", JOptionPane.ERROR_MESSAGE);
+      JOptionPane.showMessageDialog(null, "Falha ao ler o ficheiro palavras.txt.\nErro: " + e.getMessage(), "Erro", JOptionPane.ERROR_MESSAGE);
       System.exit(1);
     }
 
     if (answers.isEmpty()) {
-      JOptionPane.showMessageDialog(null, "Nenhuma palavra válida de 5 letras foi encontrada no arquivo palavras.txt.", "Erro", JOptionPane.ERROR_MESSAGE);
+      JOptionPane.showMessageDialog(null, "Nenhuma palavra válida de 5 letras foi encontrada no ficheiro palavras.txt.", "Erro", JOptionPane.ERROR_MESSAGE);
       System.exit(1);
     }
   }
@@ -294,7 +299,7 @@ public class Termo extends JFrame {
     for (int i = 0; i < LEN; i++)
       if (cur[i] == '\0') { msg.setText("Preencha todas as 5 letras"); return; }
     String g = new String(cur);
-    if (strict && !dict.containsKey(g)) { msg.setText("Essa palavra não é aceita"); return; }
+    if (strict && !dict.containsKey(g)) { msg.setText("Essa palavra não é aceite"); return; }
     reveal(g);
   }
 
@@ -362,7 +367,6 @@ public class Termo extends JFrame {
 
   private static int rank(S s) { return s == S.RIGHT ? 3 : s == S.PLACE ? 2 : 1; }
 
-  // ---------- Atualização visual ----------
   private void refreshActive() {
     for (Tile[] r : grid) for (Tile t : r) t.active = false;
     if (!over && row < TRIES) grid[row][col].active = true;

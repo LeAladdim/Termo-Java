@@ -200,7 +200,7 @@ public class Termo extends JFrame {
   }
 
   private void loadWords() {
-    Path file = Paths.get("palavras.txt");
+    Path file = Paths.get("src/palavras.txt");
 
     if (!Files.exists(file)) {
       JOptionPane.showMessageDialog(null,
